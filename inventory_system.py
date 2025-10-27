@@ -1,61 +1,92 @@
+"""Simple in-memory inventory system with JSON persistence."""
+
 import json
-import logging
 from datetime import datetime
 
 # Global variable
 stock_data = {}
 
-def addItem(item="default", qty=0, logs=[]):
+
+def add_item(item="default", qty=0, logs=None):
+    """Add quantity for an item and append an audit log entry."""
+    if logs is None:
+        logs = []
     if not item:
         return
     stock_data[item] = stock_data.get(item, 0) + qty
-    logs.append("%s: Added %d of %s" % (str(datetime.now()), qty, item))
+    logs.append(f"{datetime.now()}: Added {qty} of {item}")
 
-def removeItem(item, qty):
+
+def remove_item(item, qty):
+    """Reduce quantity for an item; delete if quantity becomes non-positive."""
     try:
         stock_data[item] -= qty
         if stock_data[item] <= 0:
             del stock_data[item]
-    except:
+    except KeyError:
+        # Ignore if item does not exist
+        pass
+    except TypeError:
+        # Ignore invalid arithmetic (e.g., wrong types)
         pass
 
-def getQty(item):
+
+def get_qty(item):
+    """Return current quantity of an item; may raise KeyError if missing."""
     return stock_data[item]
 
-def loadData(file="inventory.json"):
-    f = open(file, "r")
-    global stock_data
-    stock_data = json.loads(f.read())
-    f.close()
 
-def saveData(file="inventory.json"):
-    f = open(file, "w")
-    f.write(json.dumps(stock_data))
-    f.close()
+def load_data(file_path="inventory.json"):
+    """Load inventory from a JSON file into stock_data."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            stock_data.clear()
+            stock_data.update(data)
+    except FileNotFoundError:
+        # If file missing, keep current in-memory data
+        pass
+    except json.JSONDecodeError:
+        # If file is corrupted, keep current in-memory data
+        pass
 
-def printData():
+
+def save_data(file_path="inventory.json"):
+    """Persist current stock_data to a JSON file."""
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(stock_data, f)
+
+
+def print_data():
+    """Print a simple inventory report."""
     print("Items Report")
-    for i in stock_data:
-        print(i, "->", stock_data[i])
+    for key, val in stock_data.items():
+        print(key, "->", val)
 
-def checkLowItems(threshold=5):
+
+def check_low_items(threshold=5):
+    """Return list of item names with quantity below threshold."""
     result = []
-    for i in stock_data:
-        if stock_data[i] < threshold:
-            result.append(i)
+    for key, val in stock_data.items():
+        if val < threshold:
+            result.append(key)
     return result
 
-def main():
-    addItem("apple", 10)
-    addItem("banana", -2)
-    addItem(123, "ten")  # invalid types, no check
-    removeItem("apple", 3)
-    removeItem("orange", 1)
-    print("Apple stock:", getQty("apple"))
-    print("Low items:", checkLowItems())
-    saveData()
-    loadData()
-    printData()
-    eval("print('eval used')")  # dangerous
 
-main()
+def main():
+    """Demonstrate basic inventory operations."""
+    add_item("apple", 10)
+    add_item("banana", -2)
+    add_item("widget", 5)
+    remove_item("apple", 3)
+    remove_item("orange", 1)
+    print("Apple stock:", get_qty("apple"))
+    print("Low items:", check_low_items())
+    save_data()
+    load_data()
+    print_data()
+
+
+if __name__ == "__main__":
+    main()
